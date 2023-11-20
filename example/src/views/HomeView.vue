@@ -23,6 +23,10 @@ const pg3SlowQueryExplainUrl = ref<string>(
     url.searchParams.get("statementHash") ?? "<pg3StatementHash>"
   }/_explain`
 )
+const pg3SlowQueryAnalyze = ref<boolean | null>(
+  url.searchParams.get("analyze") === "true"
+)
+const pg3SlowQueryTimeout = ref<string | null>(url.searchParams.get("timeout"))
 const draggingPlan = ref<boolean>(false)
 const draggingQuery = ref<boolean>(false)
 const savedPlans = ref<Plan[]>()
@@ -44,7 +48,13 @@ function fetchPlanFromPG3() {
     }
 
     planInput.value = "Fetching plan from PG3..."
-    fetch(pg3SlowQueryExplainUrl.value, requestOptions)
+    var fetchUrl = new URL(pg3SlowQueryExplainUrl.value)
+    fetchUrl.search = new URLSearchParams({
+      analyze: pg3SlowQueryAnalyze.value ? "true" : "false",
+      timeout: pg3SlowQueryTimeout.value ? pg3SlowQueryTimeout.value : "5s",
+    }).toString()
+
+    fetch(fetchUrl, requestOptions)
       .then((response) => response.text())
       .then((result) => {
         planInput.value = result
@@ -157,6 +167,37 @@ function handleDrop(event: DragEvent) {
               placeholder="pg3 slow query url"
             />
             <p />
+
+            <div class="row">
+              <div class="col-sm-2">
+                <div class="custom-control custom-checkbox">
+                  <label class="custom-control-label" for="pg3SlowQueryAnalyze"
+                    >Analyze</label
+                  >
+                  <input
+                    type="checkbox"
+                    class="custom-control-input"
+                    id="pg3SlowQueryAnalyze"
+                    v-model="pg3SlowQueryAnalyze"
+                  />
+                </div>
+              </div>
+              <div class="col-sm-1">
+                <label for="pg3SlowQueryTimeout"> Timeout </label>
+              </div>
+              <div class="col-sm-4">
+                <input
+                  type="text"
+                  class="form-control"
+                  style="width: 100%"
+                  id="pg3SlowQueryTimeout"
+                  v-model="pg3SlowQueryTimeout"
+                  placeholder="eg: 30s or 2m (default: 5s)"
+                />
+              </div>
+            </div>
+            <p />
+
             <button
               type="button"
               @click="fetchPlanFromPG3()"
