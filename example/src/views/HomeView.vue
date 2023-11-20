@@ -48,7 +48,13 @@ function fetchPlanFromPG3() {
     }
 
     planInput.value = "Fetching plan from PG3..."
-    fetch(pg3SlowQueryExplainUrl.value, requestOptions)
+    var fetchUrl = new URL(pg3SlowQueryExplainUrl.value)
+    fetchUrl.search = new URLSearchParams({
+      analyze: pg3SlowQueryAnalyze.value ? "true" : "false",
+      timeout: pg3SlowQueryTimeout.value ? pg3SlowQueryTimeout.value : "5s",
+    }).toString()
+
+    fetch(fetchUrl, requestOptions)
       .then((response) => response.text())
       .then((result) => {
         planInput.value = result
@@ -186,7 +192,7 @@ function handleDrop(event: DragEvent) {
                   style="width: 100%"
                   id="pg3SlowQueryTimeout"
                   v-model="pg3SlowQueryTimeout"
-                  placeholder="eg: 30s or 2m"
+                  placeholder="eg: 30s or 2m (default: 5s)"
                 />
               </div>
             </div>
