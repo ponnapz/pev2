@@ -16,18 +16,8 @@ const url = new URL(window.location.href)
 const planInput = ref<string>("")
 const queryInput = ref<string>("")
 const queryName = ref<string>("")
-const pg3SlowQueryExplainByRequestIdUrl = ref<string>(
-  `https://${window.location.host}/api/v0/system/stats/slow_queries/${
-    url.searchParams.get("requestId") ?? "<requestId>"
-  }/_explain`
-)
-const pg3SlowQueryExplainUrl = ref<string>(
-  `https://${window.location.host}/api/v0/system/stats/${
-    url.searchParams.get("projectId") ?? "<projectId>"
-  }/slow_queries/${
-    url.searchParams.get("statementHash") ?? "<pg3StatementHash>"
-  }/_explain`
-)
+const slowQueryMode = ref<string>("requestId")
+const pg3SlowQueryExplainUrl = ref<string>("")
 const pg3SlowQueryAnalyze = ref<boolean | null>(
   url.searchParams.get("analyze") === "true"
 )
@@ -36,12 +26,30 @@ const draggingPlan = ref<boolean>(false)
 const draggingQuery = ref<boolean>(false)
 const savedPlans = ref<Plan[]>()
 
-function fetchPlanFromPG3ByHash() {
+function handleSlowQueryModeChange() {
+  if (slowQueryMode.value === "requestId") {
+    pg3SlowQueryExplainUrl.value = `https://${
+      window.location.host
+    }/api/v0/system/stats/slow_queries/${
+      url.searchParams.get("requestId") ?? "<requestId>"
+    }/_explain`
+  } else {
+    pg3SlowQueryExplainUrl.value = `https://${
+      window.location.host
+    }/api/v0/system/stats/${
+      url.searchParams.get("projectId") ?? "<projectId>"
+    }/slow_queries/${
+      url.searchParams.get("statementHash") ?? "<pg3StatementHash>"
+    }/_explain`
+  }
+}
+
+function fetchPlanFromPG3() {
   if (
     pg3SlowQueryExplainUrl.value.indexOf("<projectId>") === -1 &&
-    pg3SlowQueryExplainUrl.value.indexOf("<pg3StatementHash>") === -1
+    pg3SlowQueryExplainUrl.value.indexOf("<pg3StatementHash>") === -1 &&
+    pg3SlowQueryExplainUrl.value.indexOf("<requestId>") === -1
   ) {
-    planInput.value = "test2"
     var requestHeaders = new Headers()
     requestHeaders.append("Accept", "application/json")
 
@@ -66,38 +74,6 @@ function fetchPlanFromPG3ByHash() {
       })
       .catch((error) => {
         planInput.value = `Error when fetching explain from PG3 ${pg3SlowQueryExplainUrl.value} ${error}`
-        console.log(error)
-      })
-  }
-}
-
-function fetchPlanFromPG3ByRequestId() {
-  if (pg3SlowQueryExplainByRequestIdUrl.value.indexOf("<requestId>") === -1) {
-    planInput.value = "test2"
-    var requestHeaders = new Headers()
-    requestHeaders.append("Accept", "application/json")
-
-    var requestOptions = {
-      method: "GET",
-      headers: requestHeaders,
-      redirect: "follow",
-      credentials: "same-origin",
-    }
-
-    planInput.value = "Fetching plan from PG3..."
-    var fetchUrl = new URL(pg3SlowQueryExplainByRequestIdUrl.value)
-    fetchUrl.search = new URLSearchParams({
-      analyze: pg3SlowQueryAnalyze.value ? "true" : "false",
-      timeout: pg3SlowQueryTimeout.value ? pg3SlowQueryTimeout.value : "15s",
-    }).toString()
-
-    fetch(fetchUrl, requestOptions)
-      .then((response) => response.text())
-      .then((result) => {
-        planInput.value = result
-      })
-      .catch((error) => {
-        planInput.value = `Error when fetching explain from PG3 ${pg3SlowQueryExplainByRequestIdUrl.value} ${error}`
         console.log(error)
       })
   }
@@ -131,8 +107,9 @@ onMounted(() => {
   })
   const noHashURL = window.location.href.replace(/#.*$/, "")
   window.history.replaceState("", document.title, noHashURL)
+  handleSlowQueryModeChange()
   loadPlans()
-  fetchPlanFromPG3ByHash()
+  fetchPlanFromPG3()
 })
 
 async function loadPlans() {
@@ -195,9 +172,25 @@ function handleDrop(event: DragEvent) {
       <div class="row">
         <div class="col-sm-7">
           <div class="form-group">
-            <label for="pg3SlowQueryExplainUrl">
-              Fetch plan from PG3 by hash
-            </label>
+            <label for="pg3SlowQueryExplainUrl"> Fetch plan from PG3 by </label>
+            <p />
+            <input
+              type="radio"
+              id="byRequestId"
+              value="requestId"
+              v-model="slowQueryMode"
+              @change="handleSlowQueryModeChange"
+            />
+            <label for="one">requestId</label>
+            <input
+              type="radio"
+              id="byStatementHash"
+              value="statementHash"
+              v-model="slowQueryMode"
+              @change="handleSlowQueryModeChange"
+            />
+            <label for="two">statementHash</label>
+            <p />
             <input
               type="text"
               class="form-control"
@@ -239,62 +232,10 @@ function handleDrop(event: DragEvent) {
 
             <button
               type="button"
-              @click="fetchPlanFromPG3ByHash()"
+              @click="fetchPlanFromPG3()"
               class="btn btn-primary"
             >
-              Fetch plan from PG3 by hash
-            </button>
-            <p />
-          </div>
-          <div class="form-group">
-            <label for="pg3SlowQueryExplainUrl">
-              Fetch plan from PG3 by request id
-            </label>
-            <input
-              type="text"
-              class="form-control"
-              id="pg3SlowQueryExplainByRequestIdUrl"
-              v-model="pg3SlowQueryExplainByRequestIdUrl"
-              placeholder="pg3 slow query url"
-            />
-            <p />
-
-            <div class="row">
-              <div class="col-sm-2">
-                <div class="custom-control custom-checkbox">
-                  <label class="custom-control-label" for="pg3SlowQueryAnalyze"
-                    >Analyze</label
-                  >
-                  <input
-                    type="checkbox"
-                    class="custom-control-input"
-                    id="pg3SlowQueryAnalyze"
-                    v-model="pg3SlowQueryAnalyze"
-                  />
-                </div>
-              </div>
-              <div class="col-sm-1">
-                <label for="pg3SlowQueryTimeout"> Timeout </label>
-              </div>
-              <div class="col-sm-4">
-                <input
-                  type="text"
-                  class="form-control"
-                  style="width: 100%"
-                  id="pg3SlowQueryTimeout"
-                  v-model="pg3SlowQueryTimeout"
-                  placeholder="eg: 30s or 2m (default: 15s)"
-                />
-              </div>
-            </div>
-            <p />
-
-            <button
-              type="button"
-              @click="fetchPlanFromPG3ByRequestId()"
-              class="btn btn-primary"
-            >
-              Fetch plan from PG3 by request id
+              Fetch plan from PG3
             </button>
             <p />
           </div>
